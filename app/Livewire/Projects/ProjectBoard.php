@@ -148,6 +148,7 @@ class ProjectBoard extends Component
         });
 
         $this->skipRender();
+        $this->dispatch('reloadData');
 
         Flux::toast(text: 'Đã lưu vị trí mới.', variant: 'success');
     }

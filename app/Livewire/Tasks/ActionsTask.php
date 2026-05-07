@@ -12,15 +12,16 @@ use Livewire\Component;
 
 class ActionsTask extends Component
 {
-    // State
+    // === State cho Modal Chi Tiết ===
     public bool $isEdit = false;
     public ?int $taskId = null;
     public ?int $groupId = null;
-    public $taskTitle;
-    public $taskDescription;
+    public $taskTitle;       // Bind với input tiêu đề trong modal chi tiết
+    public $taskDescription; // Bind với editor mô tả trong modal chi tiết
+    public $taskIsDone = false; // Bind với checkbox trạng thái
     public $newComment;
 
-    // Fields
+    // === Fields cho Logic cũ (Slideover/Create) ===
     public string $name = '';
     public string $description = '';
     public string $priority = 'low';
@@ -28,16 +29,14 @@ class ActionsTask extends Component
     public ?int $assignedTo = null;
     public ?string $startAt = null;
     public ?string $deadlineAt = null;
-    public $taskIsDone = false;
 
     // -------------------------------------------------------------------------
-    // Mở slideover tạo task mới
+    // Logic Thêm nhanh Task (Từ Kanban)
     // -------------------------------------------------------------------------
     #[On('quick-add-task')]
     public function quickAddTask(int $groupId, string $name): void
     {
         $name = trim($name);
-
         if (empty($name))
             return;
 
@@ -52,13 +51,16 @@ class ActionsTask extends Component
 
         $this->dispatch('reloadData');
     }
+
+    // -------------------------------------------------------------------------
+    // Logic Mở Modal Tạo Mới
+    // -------------------------------------------------------------------------
     #[On('addTask')]
     public function openCreate(int $groupId): void
     {
         $this->resetData();
         $this->groupId = $groupId;
         $this->isEdit = false;
-        // dd($this->all());
         Flux::modal('task-detail-modal')->show();
     }
 
@@ -79,15 +81,14 @@ class ActionsTask extends Component
             'ordering' => Task::where('group_id', $this->groupId)->max('ordering') + 1,
         ]);
 
-        Flux::modal('task-slideover')->close();
+        Flux::modal('task-detail-modal')->close();
         Flux::toast(text: 'Đã tạo task mới.', variant: 'success');
         $this->dispatch('reloadData');
     }
 
     // -------------------------------------------------------------------------
-    // Mở slideover chỉnh sửa task
+    // Logic Mở Modal Chi Tiết (Khi click vào Task trên Kanban)
     // -------------------------------------------------------------------------
-
     #[On('editTask')]
     public function openEdit(int $id): void
     {
@@ -98,6 +99,13 @@ class ActionsTask extends Component
         $this->isEdit = true;
         $this->taskId = $task->id;
         $this->groupId = $task->group_id;
+
+        // Đổ dữ liệu vào các biến modal chi tiết
+        $this->taskTitle = $task->name;
+        $this->taskDescription = $task->description ?? '';
+        $this->taskIsDone = ($task->status === TaskStatus::DONE);
+
+        // Đổ dữ liệu vào các biến cũ để các hàm update cũ không lỗi
         $this->name = $task->name;
         $this->description = $task->description ?? '';
         $this->priority = $task->priority;
@@ -106,15 +114,37 @@ class ActionsTask extends Component
         $this->startAt = $task->start_at?->format('Y-m-d\TH:i');
         $this->deadlineAt = $task->deadline_at?->format('Y-m-d\TH:i');
 
-        Flux::modal('task-slideover')->show();
+        Flux::modal('task-detail-modal')->show(); // Mở modal theo ID bạn đặt
+    }
+
+    // Tự động lưu tiêu đề khi blur
+    public function updatedTaskTitle($value)
+    {
+        if ($this->taskId) {
+            Task::where('id', $this->taskId)->update(['name' => $value]);
+            $this->dispatch('reloadData');
+        }
+    }
+
+    // Tự động lưu trạng thái checkbox
+    public function toggleTaskDone()
+    {
+        if (!$this->taskId)
+            return;
+
+        $task = Task::findOrFail($this->taskId);
+        $newStatus = ($task->status === TaskStatus::DONE) ? TaskStatus::TODO : TaskStatus::DONE;
+
+        $task->update(['status' => $newStatus]);
+        $this->taskIsDone = ($newStatus === TaskStatus::DONE);
+
+        $this->dispatch('reloadData');
     }
 
     public function updateTask(): void
     {
         $this->validate();
-
         $task = Task::findOrFail($this->taskId);
-
         $task->update([
             'name' => $this->name,
             'description' => $this->description,
@@ -125,27 +155,18 @@ class ActionsTask extends Component
             'deadline_at' => $this->deadlineAt,
         ]);
 
-        Flux::modal('task-slideover')->close();
+        Flux::modal('task-detail-modal')->close();
         Flux::toast(text: 'Đã cập nhật task.', variant: 'success');
         $this->dispatch('reloadData');
     }
 
-    // -------------------------------------------------------------------------
-    // Xóa task
-    // -------------------------------------------------------------------------
-
     public function deleteTask(): void
     {
         Task::findOrFail($this->taskId)->delete();
-
-        Flux::modal('task-slideover')->close();
+        Flux::modal('task-detail-modal')->close();
         Flux::toast(text: 'Đã xóa task.', variant: 'success');
         $this->dispatch('reloadData');
     }
-
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
 
     public function resetData(): void
     {
@@ -160,6 +181,10 @@ class ActionsTask extends Component
             'assignedTo',
             'startAt',
             'deadlineAt',
+            'taskTitle',
+            'taskDescription',
+            'taskIsDone',
+            'newComment'
         ]);
         $this->status = 'todo';
         $this->priority = 'low';
@@ -170,34 +195,22 @@ class ActionsTask extends Component
     {
         return [
             'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
             'priority' => 'required|in:low,medium,high,urgent',
-            'status' => 'required|in:todo,done',
-            'assignedTo' => 'nullable|exists:users,id',
-            'startAt' => 'nullable|date',
-            'deadlineAt' => 'nullable|date|after_or_equal:startAt',
-            'groupId' => 'required|exists:task_groups,id',
-        ];
-    }
-
-    protected function messages(): array
-    {
-        return [
-            'name.required' => 'Tên task là bắt buộc.',
-            'name.max' => 'Tên task không quá 255 ký tự.',
-            'deadlineAt.after_or_equal' => 'Deadline phải sau hoặc bằng ngày bắt đầu.',
-            'groupId.required' => 'Không xác định được nhóm task.',
+            'status' => 'required',
+            'groupId' => 'required',
         ];
     }
 
     public function render()
     {
+        $currentTask = $this->taskId ? Task::with('activities.user')->find($this->taskId) : null;
         $group = $this->groupId ? TaskGroup::find($this->groupId) : null;
 
         return view('livewire.tasks.actions-task', [
             'users' => User::orderBy('name')->get(),
             'group' => $group,
             'statuses' => TaskStatus::cases(),
+            'currentTask' => $currentTask, // Truyền task hiện tại vào view
         ]);
     }
 }

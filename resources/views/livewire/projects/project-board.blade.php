@@ -27,8 +27,7 @@
 
     {{-- Kanban Board --}}
     <div class="flex-1 overflow-x-auto overflow-y-hidden p-6 min-h-0">
-        <flux:kanban
-            wire:sort="updateGroupOrder"
+        <flux:kanban wire:sort="updateGroupOrder"
             wire:sort:config="{ animation: 180, ghostClass: 'kanban-column-ghost', chosenClass: 'kanban-column-chosen', dragClass: 'kanban-column-drag' }"
             class="h-full items-start">
 
@@ -38,26 +37,24 @@
                     {{-- Header cột: inline rename --}}
                     <flux:kanban.column.header :count="$group->tasks->count()" class="kanban-column-header">
                         <x-slot name="heading">
-                            <button
-                                type="button"
-                                wire:sort:handle
-                                title="Kéo để sắp xếp danh sách"
+                            <button type="button" wire:sort:handle title="Kéo để sắp xếp danh sách"
                                 class="kanban-column-drag-handle -ml-1 mr-1 flex size-6 shrink-0 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-200">
                                 <flux:icon name="bars-3" variant="micro" />
                             </button>
                             <div x-data="{
-                                                                                    editing: false,
-                                                                                    title: '{{ addslashes($group->title) }}',
-                                                                                    save() {
-                                                                                        if (this.title.trim() === '') return;
-                                                                                        $wire.dispatchTo(
-                                                                                            'projects.actions-task-group',
-                                                                                            'save-rename',
-                                                                                            { groupId: {{ $group->id }}, newTitle: this.title }
-                                                                                        );
-                                                                                        this.editing = false;
-                                                                                    }
-                                                                                }" class="flex-1">
+                                                                                                                                    editing: false,
+                                                                                                                                    title: '{{ addslashes($group->title) }}',
+                                                                                                                                    save() {
+                                                                                                                                        if (this.title.trim() === '') return;
+                                                                                                                                        $wire.dispatchTo(
+                                                                                                                                            'projects.actions-task-group',
+                                                                                                                                            'save-rename',
+                                                                                                                                            { groupId: {{ $group->id }}, newTitle: this.title }
+                                                                                                                                        );
+                                                                                                                                        this.editing = false;
+                                                                                                                                    }
+                                                                                                                                }"
+                                class="flex-1">
                                 <span x-show="!editing"
                                     x-on:click="editing = true; $nextTick(() => $refs.input{{ $group->id }}.focus())"
                                     class="cursor-pointer hover:text-blue-500 transition-colors font-semibold text-sm block">
@@ -100,9 +97,8 @@
                     </flux:kanban.column.header>
 
                     {{-- Danh sách task --}}
-                    <flux:kanban.column.cards
-                        wire:sort="updateTaskOrder($item, $position, {{ $group->id }})"
-                        wire:sort:group="tasks"
+                    <flux:kanban.column.cards wire:sort="updateTaskOrder" wire:sort:group="tasks"
+                        wire:sort:group-id="{{ $group->id }}"
                         wire:sort:config="{ animation: 150, ghostClass: 'kanban-card-ghost', chosenClass: 'kanban-card-chosen', dragClass: 'kanban-card-drag' }">
                         @foreach($group->tasks as $task)
                                     <flux:kanban.card as="div" role="button" tabindex="0" wire:key="task-{{ $task->id }}"
@@ -111,23 +107,23 @@
                                         <x-slot name="header">
                                             <flux:badge size="sm"
                                                 :color="match($task->priority) {
-                                                                                                                                                                                                                                                        'urgent' => 'red',
-                                                                                                                                                                                                                                                        'high'   => 'orange',
-                                                                                                                                                                                                                                                        'medium' => 'yellow',
-                                                                                                                                                                                                                                                        default  => 'zinc'
-                                                                                                                                                                                                                                                    }">
+                                                                                                                                                                                                                                                                                                                                                                                                                                                        'urgent' => 'red',
+                                                                                                                                                                                                                                                                                                                                                                                                                                                        'high'   => 'orange',
+                                                                                                                                                                                                                                                                                                                                                                                                                                                        'medium' => 'yellow',
+                                                                                                                                                                                                                                                                                                                                                                                                                                                        default  => 'zinc'
+                                                                                                                                                                                                                                                                                                                                                                                                                                                    }">
                                                 {{ ucfirst($task->priority) }}
                                             </flux:badge>
                                         </x-slot>
 
                                         <div class="flex items-start gap-2">
                                             <button wire:click.stop="toggleTask({{ $task->id }})" class="mt-0.5 flex-shrink-0 size-4 rounded-full border-2 transition-all
-                                                                                                                                                                                                                                                            {{ $task->status === \App\Condition\TaskStatus::DONE
+                                                                                                                                                                                                                                                                                                                                                                                                                                                            {{ $task->status === \App\Condition\TaskStatus::DONE
                             ? 'bg-green-500 border-green-500'
                             : 'border-zinc-300 hover:border-green-400' }}">
                                             </button>
                                             <span class="text-sm font-medium text-left
-                                                                                                                                                                                                                                                        {{ $task->status === \App\Condition\TaskStatus::DONE
+                                                                                                                                                                                                                                                                                                                                                                                                                                                        {{ $task->status === \App\Condition\TaskStatus::DONE
                             ? 'line-through text-zinc-400' : '' }}">
                                                 {{ $task->name }}
                                             </span>
@@ -151,25 +147,26 @@
 
                         {{-- Inline add task --}}
                         <div x-data="{
-                                                                                    open: false,
-                                                                                    name: '',
-                                                                                    submit() {
-                                                                                        if (this.name.trim() === '') return;
-                                                                                        $wire.dispatchTo('tasks.actions-task', 'quick-add-task', {
-                                                                                            groupId: {{ $group->id }},
-                                                                                            name: this.name.trim()
-                                                                                        });
-                                                                                        this.name = '';
-                                                                                        this.open = false;
-                                                                                    }
-                                                                                }" x-on:open-inline-add-{{ $group->id }}.window="open = true; $nextTick(() => $refs.quickInput{{ $group->id }}.focus())">
+                                                                                                                                    open: false,
+                                                                                                                                    name: '',
+                                                                                                                                    submit() {
+                                                                                                                                        if (this.name.trim() === '') return;
+                                                                                                                                        $wire.dispatchTo('tasks.actions-task', 'quick-add-task', {
+                                                                                                                                            groupId: {{ $group->id }},
+                                                                                                                                            name: this.name.trim()
+                                                                                                                                        });
+                                                                                                                                        this.name = '';
+                                                                                                                                        this.open = false;
+                                                                                                                                    }
+                                                                                                                                }"
+                            x-on:open-inline-add-{{ $group->id }}.window="open = true; $nextTick(() => $refs.quickInput{{ $group->id }}.focus())">
                             <div x-show="open" x-cloak class="space-y-2 p-1">
                                 <textarea x-ref="quickInput{{ $group->id }}" x-model="name"
                                     x-on:keydown.enter.prevent="submit()" x-on:keydown.escape="open = false; name = ''"
                                     placeholder="Nhập tên thẻ..." rows="2"
                                     class="w-full rounded-lg border border-zinc-300 dark:border-zinc-600
-                                                                                               bg-white dark:bg-zinc-800 text-sm px-3 py-2
-                                                                                               focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+                                                                                                                                               bg-white dark:bg-zinc-800 text-sm px-3 py-2
+                                                                                                                                               focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
                                 <div class="flex items-center gap-2">
                                     <flux:button size="sm" variant="primary" x-on:click="submit()">
                                         Thêm thẻ
